@@ -29,12 +29,12 @@ object WikipediaRanking {
   /** Returns the number of articles on which the language `lang` occurs.
    */
   def occurrencesOfLang(lang: String, rdd: RDD[WikipediaArticle]): Int =
-    rdd.filter(_.text.contains(lang)).count.toInt
+    rdd.filter(_.mentionsLanguage(lang)).count.toInt
 
 
   protected def articlesForLang(langs: List[String], rdd: RDD[WikipediaArticle]): Map[String, RDD[WikipediaArticle]] =
     langs.foldLeft(Map[String,RDD[WikipediaArticle]]()){ (m,lang) =>
-      m + (lang -> rdd.filter(_.text.contains(lang)))
+      m + (lang -> rdd.filter(_.mentionsLanguage(lang)))
     }
 
   protected def countsForLang(langs: List[String], rdd: RDD[WikipediaArticle]): Map[String,Int] =
@@ -58,7 +58,7 @@ object WikipediaRanking {
 //    // okay, easy enough to figure out which languages each article refers to
 //    val langsForArticles = rdd
 //      .map { article =>
-//          (article, langs.filter(article.text.contains))
+//          (article, langs.filter(article.mentionsLanguage))
 //        }
 //      .filter(_._2.nonEmpty)
 //
@@ -91,7 +91,7 @@ object WikipediaRanking {
     rdd
       // enumerate all combinations
       .flatMap { article =>
-        langs.filter(article.text.contains).map((_, article))
+        langs.filter(article.mentionsLanguage).map((_, article))
       }
       // make lists of articles for each language
       .groupBy(_._1)
@@ -109,9 +109,7 @@ object WikipediaRanking {
    */
   def rankLangsUsingIndex(index: RDD[(String, Iterable[WikipediaArticle])]): List[(String, Int)] =
     index
-      .map{ case(lang, articles) =>
-          (lang, articles.size)
-        }
+      .mapValues(_.size)
       .collect()
       .sortBy(_._2)
       .reverse
@@ -131,7 +129,7 @@ object WikipediaRanking {
       // enumerate all combinations, but don't keep the article, just a count
       //  (it seems weird, but we need a list of tuples for reduceByKey)
       .flatMap { article =>
-        langs.filter(article.text.contains).map((_, 1))
+        langs.filter(article.mentionsLanguage).map((_, 1))
       }
       // add up all the 1's
       .reduceByKey {_ + _}
@@ -147,6 +145,17 @@ object WikipediaRanking {
       Processing Part 3: ranking using reduceByKey took 1207 ms.
    */
 
+  /*
+   * whoops!!! I was doing it wrong!!  I submitted and got 7/14... turns out
+   *  I was doing just the string 'contains' when I should have been looking for
+   *  a separate word.  D'uh:  'Java' would also match "Javascript" incorrectly
+   *
+   * but this is a bit slower, just for splitting all the strings...
+       TIMING: Processing Part 1: naive ranking took 18387 ms.
+      Processing Part 2: ranking using inverted index took 16467 ms.
+      Processing Part 3: ranking using reduceByKey took 10899 ms.
+
+   */
   def main(args: Array[String]) {
 
 
