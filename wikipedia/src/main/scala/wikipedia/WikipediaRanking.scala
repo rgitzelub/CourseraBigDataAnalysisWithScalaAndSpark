@@ -54,29 +54,52 @@ object WikipediaRanking {
   /* Compute an inverted index of the set of articles, mapping each language
    * to the Wikipedia pages in which it occurs.
    */
-  def makeIndex(langs: List[String], rdd: RDD[WikipediaArticle]): RDD[(String, Iterable[WikipediaArticle])] = {
-    // okay, easy enough to figure out which languages each article refers to
-    val langsForArticles = rdd
-      .map { article =>
-          (article, langs.filter(article.text.contains))
-        }
-      .filter(_._2.nonEmpty)
+//  def makeIndex(langs: List[String], rdd: RDD[WikipediaArticle]): RDD[(String, Iterable[WikipediaArticle])] = {
+//    // okay, easy enough to figure out which languages each article refers to
+//    val langsForArticles = rdd
+//      .map { article =>
+//          (article, langs.filter(article.text.contains))
+//        }
+//      .filter(_._2.nonEmpty)
+//
+//    // but now what?  I really need to *flatMap* here, to break out a tuple for every lang, but how do I create a new RDD?
+//    //  isn't there something magic in RDD?  Or... is it in the Context?
+//    // oh!!! I don't have to!  RDD.flatMap doesn't generate an RDD, just a collection! weird...
+//    val langsAndArticles = langsForArticles.flatMap { case (article, listOfLangs) => // wtf? can't name the args?
+//      listOfLangs.map((article, _))
+//    }
+//    // group that by lang, and then remove the now-redundant tuple
+//    val x = langsAndArticles
+//      .groupBy(_._2)
+//      .map{ case(lang, listOfArticles) =>
+//        (lang, listOfArticles.map(_._1))
+//      }
+//    // tada!
+//    x
+//  }
 
-    // but now what?  I really need to *flatMap* here, to break out a tuple for every lang, but how do I create a new RDD?
-    //  isn't there something magic in RDD?  Or... is it in the Context?
-    // oh!!! I don't have to!  RDD.flatMap doesn't generate an RDD, just a collection! weird...
-    val langsAndArticles = langsForArticles.flatMap { case (article, listOfLangs) => // wtf? can't name the args?
-      listOfLangs.map((article, _))
-    }
-    // group that by lang, and then remove the now-redundant tuple
-    val x = langsAndArticles
-      .groupBy(_._2)
-      .map{ case(lang, listOfArticles) =>
-        (lang, listOfArticles.map(_._1))
+  // both versions run about the same:
+  //   TIMING: Processing Part 1: naive ranking took 8170 ms.
+  //     Processing Part 2: ranking using inverted index took 7114 ms.
+
+  // interesting what happens if you .persist the RDD up at the top
+  //   TIMING: Processing Part 1: naive ranking took 2372 ms.
+  //   Processing Part 2: ranking using inverted index took 8422 ms.
+
+
+  def makeIndex(langs: List[String], rdd: RDD[WikipediaArticle]): RDD[(String, Iterable[WikipediaArticle])] =
+    rdd
+      // enumerate all combinations
+      .flatMap { article =>
+        langs.filter(article.text.contains).map((_, article))
       }
-    // tada!
-    x
-  }
+      // make lists of articles for each language
+      .groupBy(_._1)
+      // remove the now-redundant tuples
+      .map{ case(lang, listOfLangArticlePairs) =>
+        (lang, listOfLangArticlePairs.map(_._2))
+      }
+
 
   /* (2) Compute the language ranking again, but now using the inverted index. Can you notice
    *     a performance improvement?
@@ -85,7 +108,16 @@ object WikipediaRanking {
    *   several seconds.
    */
   def rankLangsUsingIndex(index: RDD[(String, Iterable[WikipediaArticle])]): List[(String, Int)] =
-    index.map{ case(lang, articles) => (lang, articles.size) }.collect().sortBy(_._2).reverse.toList
+    index
+      .map{ case(lang, articles) =>
+          (lang, articles.size)
+        }
+      .collect()
+      .sortBy(_._2)
+      .reverse
+      .toList
+
+
 
   /* (3) Use `reduceByKey` so that the computation of the index and the ranking are combined.
    *     Can you notice an improvement in performance compared to measuring *both* the computation of the index
