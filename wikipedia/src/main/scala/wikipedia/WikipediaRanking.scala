@@ -126,7 +126,26 @@ object WikipediaRanking {
    *   Note: this operation is long-running. It can potentially run for
    *   several seconds.
    */
-  def rankLangsReduceByKey(langs: List[String], rdd: RDD[WikipediaArticle]): List[(String, Int)] = ???
+  def rankLangsReduceByKey(langs: List[String], rdd: RDD[WikipediaArticle]): List[(String, Int)] =
+    rdd
+      // enumerate all combinations, but don't keep the article, just a count
+      //  (it seems weird, but we need a list of tuples for reduceByKey)
+      .flatMap { article =>
+        langs.filter(article.text.contains).map((_, 1))
+      }
+      // add up all the 1's
+      .reduceByKey {_ + _}
+      .collect()
+      .toList
+      .sortBy(_._2)
+      .reverse
+
+  /*
+   * that's definitely quicker!
+      TIMING: Processing Part 1: naive ranking took 8157 ms.
+      Processing Part 2: ranking using inverted index took 6563 ms.
+      Processing Part 3: ranking using reduceByKey took 1207 ms.
+   */
 
   def main(args: Array[String]) {
 
@@ -143,10 +162,12 @@ object WikipediaRanking {
     /* Languages ranked according to (2), using the inverted index */
     val langsRanked2: List[(String, Int)] = timed("Part 2: ranking using inverted index", rankLangsUsingIndex(index))
 
-//    /* Languages ranked according to (3) */
-//    val langsRanked3: List[(String, Int)] = timed("Part 3: ranking using reduceByKey", rankLangsReduceByKey(langs, wikiRdd))
+    /* Languages ranked according to (3) */
+    val langsRanked3: List[(String, Int)] = timed("Part 3: ranking using reduceByKey", rankLangsReduceByKey(langs, wikiRdd))
 
     println(langsRanked)
+    println(langsRanked2)
+    println(langsRanked3)
 
     /* Output the speed of each ranking */
     println("TIMING: " + timing)
