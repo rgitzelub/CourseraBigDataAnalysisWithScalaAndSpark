@@ -8,7 +8,14 @@ import annotation.tailrec
 import scala.reflect.ClassTag
 
 /** A raw stackoverflow posting, either a question or an answer */
-case class Posting(postingType: Int, id: Int, acceptedAnswer: Option[Int], parentId: Option[Int], score: Int, tags: Option[String]) extends Serializable
+case class Posting(
+  postingType: Int,
+  id: Int,
+  acceptedAnswer: Option[Int],
+  parentId: Option[Int],
+  score: Int,
+  tags: Option[String]
+) extends Serializable
 
 
 /** The main class */
@@ -76,28 +83,38 @@ class StackOverflow extends Serializable {
     })
 
 
+
   /** Group the questions and answers together */
   def groupedPostings(postings: RDD[Posting]): RDD[(Int, Iterable[(Posting, Posting)])] = {
-    ???
+    val questions = postings.filter(_.postingType == 1).map(posting => (posting.id, posting))
+    val answers = postings.filter(p => p.postingType == 2 && p.parentId.isDefined).map(posting => (posting.parentId.get, posting))
+    val combined = questions.join(answers)
+    combined.groupByKey
   }
 
 
   /** Compute the maximum score for each posting */
   def scoredPostings(grouped: RDD[(Int, Iterable[(Posting, Posting)])]): RDD[(Posting, Int)] = {
 
-    def answerHighScore(as: Array[Posting]): Int = {
-      var highScore = 0
-          var i = 0
-          while (i < as.length) {
-            val score = as(i).score
-                if (score > highScore)
-                  highScore = score
-                  i += 1
-          }
-      highScore
-    }
+    // SERIOUSLY!??!??!
+//    def answerHighScore(as: Array[Posting]): Int = {
+//      var highScore = 0
+//          var i = 0
+//          while (i < as.length) {
+//            val score = as(i).score
+//                if (score > highScore)
+//                  highScore = score
+//                  i += 1
+//          }
+//      highScore
+//    }
+    def answerHighScore(as: Array[Posting]): Int = as.map(_.score).max
 
-    ???
+    grouped.map{ t =>
+      val question = t._2.head._1
+      val answers = t._2.map(_._2)
+      (question, answers.map(_.score).max)
+    }
   }
 
 
@@ -117,7 +134,16 @@ class StackOverflow extends Serializable {
       }
     }
 
-    ???
+    val languageQuestionScoreTuple = scored
+      .map{ case (posting, score) =>
+          (firstLangInTag(posting.tags, langs), (posting, score))
+        }
+      .filter(_._1.isDefined)
+      .map(t => (t._1.get, t._2))
+      .groupByKey()
+
+    // lots of tuple-untangling in Spark!
+    languageQuestionScoreTuple.map(t => (t._1, t._2.map(_._2).max))
   }
 
 
