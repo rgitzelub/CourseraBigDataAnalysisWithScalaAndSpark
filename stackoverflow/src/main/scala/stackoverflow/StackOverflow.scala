@@ -8,6 +8,9 @@ import annotation.tailrec
 import scala.reflect.ClassTag
 
 /** A raw stackoverflow posting, either a question or an answer */
+// I really don't like this data structure... shouldn't 'lang' be explicit, for instance?
+//  and it would be better to have two classes with a trait, so we can do pattern matching
+//  rather than having 'postingType'... but I guess this isn't a Scala class...
 case class Posting(
   postingType: Int,
   id: Int,
@@ -143,7 +146,9 @@ class StackOverflow extends Serializable {
       .groupByKey()
 
     // lots of tuple-untangling in Spark!
-    languageQuestionScoreTuple.map(t => (t._1, t._2.map(_._2).max))
+    languageQuestionScoreTuple
+      .map(t => (t._1 * langSpread, t._2.map(_._2).max))
+      .sortBy(_._1)
   }
 
 

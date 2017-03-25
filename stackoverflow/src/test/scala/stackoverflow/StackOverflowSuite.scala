@@ -17,6 +17,7 @@ class StackOverflowSuite extends FlatSpec with BeforeAndAfterAll {
 
 
   lazy val testObject = new StackOverflow {
+    // WHY override these???
     override val langs =
       List(
         "JavaScript", "Java", "PHP", "Python", "C#", "C++", "Ruby", "CSS",
@@ -45,23 +46,23 @@ class StackOverflowSuite extends FlatSpec with BeforeAndAfterAll {
   ))
 
   val oneQuestionOneAnswer = sc.parallelize(List(
-    Posting(1, 100, Some(200), None, 0, None),
+    Posting(1, 100, Some(200), None, 0, Some("Scala")),
     Posting(2, 200, None, Some(100), 20, None)
   ))
 
   val oneQuestionThreeAnswers = sc.parallelize(List(
-    Posting(1, 100, Some(200), None, 0, None),
+    Posting(1, 100, Some(200), None, 0, Some("Scala")),
     Posting(2, 200, None, Some(100), 20, None),
     Posting(2, 300, None, Some(100), 30, None),
     Posting(2, 400, None, Some(100), 40, None)
   ))
 
   val twoQuestionsFiveAnswers = sc.parallelize(List(
-    Posting(1, 100, Some(200), None, 0, None),
+    Posting(1, 100, Some(200), None, 0, Some("Scala")),
     Posting(2, 200, None, Some(100), 20, None),
     Posting(2, 300, None, Some(100), 30, None),
     Posting(2, 400, None, Some(100), 40, None),
-    Posting(1, 500, Some(700), None, 0, None),
+    Posting(1, 500, Some(700), None, 0, Some("JavaScript")),
     Posting(2, 600, None, Some(500), 60, None),
     Posting(2, 700, None, Some(500), 70, None)
   ))
@@ -129,6 +130,24 @@ class StackOverflowSuite extends FlatSpec with BeforeAndAfterAll {
     results(0)._2 should be (40)
     results(1)._1.id should be (500)
     results(1)._2 should be (70)
+  }
+
+
+  "vectorPostings" should "find one question and multiple answers" in {
+    val results = vectorPostings(scoredPostings(groupedPostings(oneQuestionOneAnswer))).collect
+    results.size should be (1)
+    results(0)._1 should be (10 * 50000)
+    results(0)._2 should be (20)
+  }
+
+
+  "vectorPostings" should "find multiple questions and multiple answers" in {
+    val results = vectorPostings(scoredPostings(groupedPostings(twoQuestionsFiveAnswers))).collect
+    results.size should be (2)
+    results(0)._1 should be (0 * 50000)
+    results(0)._2 should be (70)
+    results(1)._1 should be (10 * 50000)
+    results(1)._2 should be (40)
   }
 
 }
