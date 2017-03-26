@@ -67,6 +67,14 @@ class StackOverflowSuite extends FlatSpec with BeforeAndAfterAll {
     Posting(2, 700, None, Some(500), 70, None)
   ))
 
+
+  val twoQuestionsOnSameLanguage = sc.parallelize(List(
+    Posting(1, 100, Some(200), None, 0, Some("Scala")),
+    Posting(2, 200, None, Some(100), 20, None),
+    Posting(1, 300, Some(400), None, 0, Some("Scala")),
+    Posting(2, 400, None, Some(300), 40, None)
+  ))
+
   "groupedPostings" should "work on empty list" in {
      groupedPostings(noPostings).count should be (0)
   }
@@ -150,4 +158,13 @@ class StackOverflowSuite extends FlatSpec with BeforeAndAfterAll {
     results(1)._2 should be (40)
   }
 
+
+  "vectorPostings" should "work when multiple questions on same language" in {
+    val results = vectorPostings(scoredPostings(groupedPostings(twoQuestionsOnSameLanguage))).collect
+    results.size should be (2)
+    results(0)._1 should be (10 * 50000)
+    results(0)._2 should be (20)
+    results(1)._1 should be (10 * 50000)
+    results(1)._2 should be (40)
+  }
 }

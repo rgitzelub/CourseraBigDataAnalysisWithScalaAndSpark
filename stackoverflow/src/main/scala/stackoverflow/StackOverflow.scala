@@ -30,11 +30,20 @@ object StackOverflow extends StackOverflow {
   /** Main function */
   def main(args: Array[String]): Unit = {
 
-    val lines   = sc.textFile("src/main/resources/stackoverflow/stackoverflow.csv")
+    val lines   = sc.textFile("src/main/resources/stackoverflow/stackoverflow.csv").sample(true, 0.1, 0)
     val raw     = rawPostings(lines)
     val grouped = groupedPostings(raw)
     val scored  = scoredPostings(grouped)
     val vectors = vectorPostings(scored)
+
+//    val ss = List(
+//      "raw: " + raw.count,
+//      "grouped: " + grouped.count,
+//      "scored: " + scored.count,
+//      "vectors: " + vectors.count
+//    )
+//    ss.foreach(println)
+
 //    assert(vectors.count() == 2121822, "Incorrect number of vectors: " + vectors.count())
 
     val means   = kmeans(sampleVectors(vectors), vectors, debug = true)
@@ -143,11 +152,10 @@ class StackOverflow extends Serializable {
         }
       .filter(_._1.isDefined)
       .map(t => (t._1.get, t._2))
-      .groupByKey()
 
     // lots of tuple-untangling in Spark!
     languageQuestionScoreTuple
-      .map(t => (t._1 * langSpread, t._2.map(_._2).max))
+      .map(t => (t._1 * langSpread, t._2._2))
       .sortBy(_._1)
   }
 
@@ -203,9 +211,29 @@ class StackOverflow extends Serializable {
 
   /** Main kmeans computation */
   @tailrec final def kmeans(means: Array[(Int, Int)], vectors: RDD[(Int, Int)], iter: Int = 1, debug: Boolean = false): Array[(Int, Int)] = {
-    val newMeans = means.clone() // you need to compute newMeans
+    val vectorsForMeansIndex = vectors
+      .map{ v => (findClosest(v, means), v) }
+      .groupByKey
+      .mapValues(averageVectors)
+      .sortBy(_._1)
+      .collect
+      .toMap
 
-    // TODO: Fill in the newMeans array
+//    println("new means:")
+//    vectorsForMeansIndex.foreach(println)
+
+    // seems some of them aren't closest to *any* points,
+    //  so make sure to put them back in the list
+    val newMeans = (0 until means.size).map { i =>
+      vectorsForMeansIndex.getOrElse(i, means(i))
+    }.toArray
+
+//    println("old means: ")
+//    means.foreach(println)
+//
+//    println("new means:")
+//    newMeans.foreach(println)
+
     val distance = euclideanDistance(means, newMeans)
 
     if (debug) {
@@ -304,10 +332,11 @@ class StackOverflow extends Serializable {
     val closestGrouped = closest.groupByKey()
 
     val median = closestGrouped.mapValues { vs =>
-      val langLabel: String   = ??? // most common language in the cluster
-      val langPercent: Double = ??? // percent of the questions in the most common language
-      val clusterSize: Int    = ???
-      val medianScore: Int    = ???
+      val mostCommon = vs.groupBy(_._1).toList.maxBy(_._2.size)
+      val langLabel: String   = langs(mostCommon._1 / langSpread) // most common language in the cluster
+      val langPercent: Double = mostCommon._2.size.toDouble / vs.size // percent of the questions in the most common language
+      val clusterSize: Int    = vs.size
+      val medianScore: Int    = mostCommon._2.map(_._2).toArray.apply(mostCommon._2.size / 2)
 
       (langLabel, langPercent, clusterSize, medianScore)
     }
