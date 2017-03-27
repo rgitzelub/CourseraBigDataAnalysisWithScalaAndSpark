@@ -34,7 +34,7 @@ object StackOverflow extends StackOverflow {
     val raw     = rawPostings(lines)
     val grouped = groupedPostings(raw)
     val scored  = scoredPostings(grouped)
-    val vectors = vectorPostings(scored)
+    val vectors = vectorPostings(scored).cache
 
 //    val ss = List(
 //      "raw: " + raw.count,
@@ -249,7 +249,7 @@ class StackOverflow extends Serializable {
     if (converged(distance))
       newMeans
     else if (iter < kmeansMaxIterations)
-      kmeans(newMeans, vectors, iter + 1, debug)
+      kmeans(newMeans, vectors.cache, iter + 1, debug)
     else {
       println("Reached max iterations!")
       newMeans
@@ -322,15 +322,18 @@ class StackOverflow extends Serializable {
 
 
 
-  protected def median(array: Array[Int]): Int = {
-    val half = array.size / 2
-    if (array.size % 2 == 0) {
-      (array(half - 1) + array(half)) / 2
-    }
+  protected def median(array: Array[Int]): Int =
+    if(array.size == 1)
+      array.head
     else {
-      array(half + 1)
+      val half = array.size / 2
+      if (array.size % 2 == 0) {
+        (array(half - 1) + array(half)) / 2
+      }
+      else {
+        array(half + 1)
+      }
     }
-  }
 
   //
   //
@@ -342,11 +345,11 @@ class StackOverflow extends Serializable {
     val closestGrouped = closest.groupByKey()
 
     val t = closestGrouped.mapValues { vs =>
-      val mostCommon = vs.groupBy(_._1).toList.maxBy(_._2.size)
-      val langLabel: String   = langs(mostCommon._1 / langSpread) // most common language in the cluster
-      val langPercent: Double = 100.0 * mostCommon._2.size / vs.size // percent of the questions in the most common language
+      val dominant = vs.groupBy(_._1).toList.maxBy(_._2.size)
+      val langLabel: String   = langs(dominant._1 / langSpread) // most common language in the cluster
+      val langPercent: Double = 100.0 * dominant._2.size / vs.size // percent of the questions in the most common language
       val clusterSize: Int    = vs.size
-      val medianScore: Int    = median(mostCommon._2.map(_._2).toArray.sorted)
+      val medianScore: Int    = median(vs.map(_._2).toArray.sorted) // ooooo, median of ALL not just dominant
 
       (langLabel, langPercent, clusterSize, medianScore)
     }

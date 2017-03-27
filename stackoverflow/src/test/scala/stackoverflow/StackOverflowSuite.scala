@@ -205,6 +205,16 @@ class StackOverflowSuite extends FlatSpec with BeforeAndAfterAll {
     ).sortBy(_._1)
 
     results.size should be (1)
-    results(0) should be (("Scala", 1.0, 1, 40))
+    results(0) should be (("Scala", 100.0, 2, 30))
+  }
+
+  // https://www.coursera.org/learn/scala-spark-big-data/discussions/weeks/2/threads/x5PgXAwLEeeoaxKMCL9POg
+  "test from forum" should "work" in {
+    val vectors = StackOverflow.sc.parallelize(List((550000, 13), (200000, 12), (50000, 16)))
+    val means = Array((125000, 14), (550000, 13))
+    val results = testObject.clusterResults(means, vectors)
+    testObject.printResults(results)
+    assert(results.contains("Haskell", 100.0, 1, 13))
+    assert(results.contains("C#", 50.0, 2, 14))
   }
 }
