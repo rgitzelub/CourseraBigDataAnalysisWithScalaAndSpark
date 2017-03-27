@@ -159,12 +159,52 @@ class StackOverflowSuite extends FlatSpec with BeforeAndAfterAll {
   }
 
 
-  "vectorPostings" should "work when multiple questions on same language" in {
+  "vectorPostings" should "work for multiple questions on same language" in {
     val results = vectorPostings(scoredPostings(groupedPostings(twoQuestionsOnSameLanguage))).collect
     results.size should be (2)
     results(0)._1 should be (10 * 50000)
     results(0)._2 should be (20)
     results(1)._1 should be (10 * 50000)
     results(1)._2 should be (40)
+  }
+
+  "clusterGrouping" should "detect two clusters" in {
+    val results = clusterResults(
+      Array(
+        (0,1),
+        (50000,1)
+      ),
+      vectorPostings(
+        scoredPostings(
+          groupedPostings(
+            twoQuestionsFiveAnswers
+          )
+        )
+      )
+    ).sortBy(_._1)
+
+    results.size should be (2)
+    results(0) should be (("JavaScript", 1.0, 1, 70))
+    results(1) should be (("Scala", 1.0, 1, 40))
+  }
+
+
+  "clusterGrouping" should "detect one cluster when two questions of same lang" in {
+    val results = clusterResults(
+      Array(
+        (40000,1),
+        (50000,1)
+      ),
+      vectorPostings(
+        scoredPostings(
+          groupedPostings(
+            twoQuestionsOnSameLanguage
+          )
+        )
+      )
+    ).sortBy(_._1)
+
+    results.size should be (1)
+    results(0) should be (("Scala", 1.0, 1, 40))
   }
 }

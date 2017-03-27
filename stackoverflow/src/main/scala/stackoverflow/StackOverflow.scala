@@ -30,7 +30,7 @@ object StackOverflow extends StackOverflow {
   /** Main function */
   def main(args: Array[String]): Unit = {
 
-    val lines   = sc.textFile("src/main/resources/stackoverflow/stackoverflow.csv").sample(true, 0.1, 0)
+    val lines   = sc.textFile("src/main/resources/stackoverflow/stackoverflow.csv")//.sample(true, 0.1, 0)
     val raw     = rawPostings(lines)
     val grouped = groupedPostings(raw)
     val scored  = scoredPostings(grouped)
@@ -322,6 +322,16 @@ class StackOverflow extends Serializable {
 
 
 
+  protected def median(array: Array[Int]): Int = {
+    val half = array.size / 2
+    if (array.size % 2 == 0) {
+      (array(half - 1) + array(half)) / 2
+    }
+    else {
+      array(half + 1)
+    }
+  }
+
   //
   //
   //  Displaying results:
@@ -331,17 +341,17 @@ class StackOverflow extends Serializable {
     val closest = vectors.map(p => (findClosest(p, means), p))
     val closestGrouped = closest.groupByKey()
 
-    val median = closestGrouped.mapValues { vs =>
+    val t = closestGrouped.mapValues { vs =>
       val mostCommon = vs.groupBy(_._1).toList.maxBy(_._2.size)
       val langLabel: String   = langs(mostCommon._1 / langSpread) // most common language in the cluster
-      val langPercent: Double = mostCommon._2.size.toDouble / vs.size // percent of the questions in the most common language
+      val langPercent: Double = 100.0 * mostCommon._2.size / vs.size // percent of the questions in the most common language
       val clusterSize: Int    = vs.size
-      val medianScore: Int    = mostCommon._2.map(_._2).toArray.apply(mostCommon._2.size / 2)
+      val medianScore: Int    = median(mostCommon._2.map(_._2).toArray.sorted)
 
       (langLabel, langPercent, clusterSize, medianScore)
     }
 
-    median.collect().map(_._2).sortBy(_._4)
+    t.collect().map(_._2).sortBy(_._4)
   }
 
   def printResults(results: Array[(String, Double, Int, Int)]): Unit = {
