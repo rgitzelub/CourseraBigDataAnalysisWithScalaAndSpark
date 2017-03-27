@@ -185,7 +185,7 @@ class StackOverflowSuite extends FlatSpec with BeforeAndAfterAll {
 
     results.size should be (2)
     results(0) should be (("JavaScript", 1.0, 1, 70))
-    results(1) should be (("Scala", 1.0, 1, 40))
+    results(1) should be (("Scala", 100.0, 1, 40))
   }
 
 
@@ -215,6 +215,6 @@ class StackOverflowSuite extends FlatSpec with BeforeAndAfterAll {
     val results = testObject.clusterResults(means, vectors)
     testObject.printResults(results)
     assert(results.contains("Haskell", 100.0, 1, 13))
-    assert(results.contains("C#", 50.0, 2, 14))
+    assert(results.contains("C#", 50.0, 2, 14))  // why this instead of Java?
   }
 }

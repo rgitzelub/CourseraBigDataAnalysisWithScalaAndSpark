@@ -331,7 +331,7 @@ class StackOverflow extends Serializable {
         (array(half - 1) + array(half)) / 2
       }
       else {
-        array(half + 1)
+        array(half)
       }
     }
 
